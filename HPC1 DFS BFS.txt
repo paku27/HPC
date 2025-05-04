@@ -1,0 +1,112 @@
+
+#include<iostream>
+#include<queue>
+#include<vector>
+#include<omp.h>
+using namespace std;
+
+class Graph{
+    int V;
+    vector<vector<int>>adj;
+    
+    public:
+    Graph(int V) : V(V){
+        adj.resize(V);
+    }
+    void addEdge(int u, int v){
+        adj[u].push_back(v);
+        adj[v].push_back(u);
+    }
+    void ParallelBFS(int Start){
+        vector<bool>Visited(V,false);
+        queue<int>q;
+        
+        Visited[Start]=true;
+        q.push(Start);
+        
+        while(!q.empty()){
+            int size = q.size();
+            #pragma omp parallel for
+            for(int i=0; i<q.size();i++){
+                 int u;
+                 #pragma omp critical
+                 {
+                     if(!q.empty()){
+                         u=q.front();
+                         q.pop();
+                     }
+                     else{
+                         continue;
+                     }
+                 }
+                 cout<<u<<" ";
+                 for(int j = 0; j < adj[u].size(); ++j){
+                     int v = adj[u][j];
+                     #pragma omp critical
+                     
+                     if(!Visited[v]){
+                         Visited[v] = true;
+                         q.push(v);
+                     }
+                 }
+            }
+        }
+        cout<<endl;
+    }
+    void parallelDFS(int Start){
+        vector<bool>visited(V,false);
+        
+        #pragma omp parallel for
+        {
+            dfsUtil(Start,visited);
+        }
+        cout<<endl;
+    }
+    private:
+    void dfsUtil(int u, vector<bool>&Visited){
+        #pragma omp critical
+        {
+            if(Visited[u])
+                return;
+            else
+                Visited[u] = true;
+            
+            cout<<u<<" ";
+        }
+        for(int i=0; i<adj[u].size();++i){
+            int v = adj[u][i];
+             #pragma omp firstprivate(v)
+             dfsUtil(v, Visited);
+        }
+        #pragma omp taskwait
+    }
+};
+int main(){
+    int V, E, v, u;
+    cout<<"No. of Vertices:";
+    cin>>V;
+    cout<<"No. of Edges:";
+    cin>>E;
+    
+    Graph g(V);
+    
+    for(int i=0; i<E; i++){
+        cout<<"Add Edge "<<i+1<<":";
+        cin>>v>>u;
+        g.addEdge(v,u);
+    }
+    
+    int start;
+    cout<<"Enter vertex you want to start bfs dfs from:";
+    cin>>start;
+    
+    cout<<"Parallel BFS:";
+    g.ParallelBFS(start);
+    
+    cout<<"Parallel DFS:";
+    g.parallelDFS(start);
+    
+    return 0;
+}
+
+
